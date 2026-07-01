@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--episodes", type=int, default=1000)
     train.add_argument("--seed", type=int, default=42)
     train.add_argument("--max-steps", type=int, default=None)
+    train.add_argument("--eval-episodes", type=int, default=100)
 
     evaluate = subparsers.add_parser("eval", help="Evalua la IA")
     evaluate.add_argument("--episodes", type=int, default=200)
@@ -48,13 +49,23 @@ def main() -> None:
 
     if args.command == "train":
         config = build_game_config(args.max_steps)
-        stats = agent.train(args.episodes, seed=args.seed, config=config)
+        stats = agent.train(
+            args.episodes,
+            seed=args.seed,
+            config=config,
+            eval_episodes=args.eval_episodes,
+        )
         save_q_table(agent.q_table)
         print(
             f"Entrenadas: {stats.episodes} | "
             f"Promedio: {stats.average_score:.2f} | "
             f"Mejor: {stats.best_score} | "
             f"Estados: {stats.q_states}"
+        )
+        print(
+            f"Evaluacion post-train: "
+            f"Promedio: {stats.eval_average_score:.2f} | "
+            f"Mejor: {stats.eval_best_score}"
         )
         return
 
