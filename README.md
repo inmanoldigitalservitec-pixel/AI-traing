@@ -14,6 +14,16 @@ El entrenamiento corre sin graficos para poder simular muchas partidas rapido.
 - Python 3.10+
 - No requiere dependencias externas
 
+## Flujo recomendado
+
+Este es el flujo principal para entrenar, medir y ver la IA jugando:
+
+```bash
+python3 -m color_jump_ai train --episodes 10000 --max-steps 10000
+python3 -m color_jump_ai eval --episodes 100 --max-steps 10000
+python3 -m color_jump_ai play --max-steps 50000
+```
+
 ## Comandos
 
 Entrenar 5000 partidas:
