@@ -38,6 +38,9 @@ class QAgent:
             return self.random.choice([WAIT, TAP])
 
         wait_q, tap_q = self._values(state)
+        if abs(tap_q - wait_q) < 2.0:
+            return self._heuristic_action(state)
+
         return TAP if tap_q > wait_q else WAIT
 
     def learn(self, state: State, action: int, reward: float, next_state: State, done: bool) -> None:
@@ -107,3 +110,29 @@ class QAgent:
         if key not in self.q_table:
             self.q_table[key] = [0.0, 0.0]
         return self.q_table[key]
+
+    def _heuristic_action(self, state: State) -> int:
+        distance = state.distance_bucket
+        velocity = state.velocity_bucket
+        color_matches = state.ball_color == state.target_color
+
+        if not color_matches and distance <= 260:
+            return WAIT
+
+        if color_matches and 0 <= distance <= 240:
+            return TAP
+
+        if velocity <= -3 and distance > 100:
+            return TAP
+
+        if 0 <= distance <= 220:
+            if not color_matches:
+                return WAIT
+            if velocity <= 5:
+                return TAP
+            return WAIT
+
+        if distance <= 0 and color_matches and velocity < 6:
+            return TAP
+
+        return WAIT
