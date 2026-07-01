@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import random
+
+from .env import ColorJumpEnv, State
+
+
+WAIT = 0
+TAP = 1
+
+
+@dataclass
+class TrainStats:
+    episodes: int
+    best_score: int
+    average_score: float
+    q_states: int
+
+
+class QAgent:
+    def __init__(
+        self,
+        q_table: dict[str, list[float]] | None = None,
+        learning_rate: float = 0.14,
+        discount: float = 0.92,
+        epsilon: float = 0.18,
+        seed: int | None = None,
+    ):
+        self.q_table = q_table or {}
+        self.learning_rate = learning_rate
+        self.discount = discount
+        self.epsilon = epsilon
+        self.random = random.Random(seed)
+
+    def choose_action(self, state: State, explore: bool = True) -> int:
+        if explore and self.random.random() < self.epsilon:
+            return self.random.choice([WAIT, TAP])
+
+        wait_q, tap_q = self._values(state)
+        return TAP if tap_q > wait_q else WAIT
+
+    def learn(self, state: State, action: int, reward: float, next_state: State, done: bool) -> None:
+        values = self._values(state)
+        next_values = self._values(next_state)
+        target = reward if done else reward + self.discount * max(next_values)
+        values[action] += self.learning_rate * (target - values[action])
+        self.q_table[state.key()] = values
+
+    def train(self, episodes: int, seed: int | None = None) -> TrainStats:
+        scores: list[int] = []
+        best_score = 0
+
+        for episode in range(episodes):
+            env_seed = None if seed is None else seed + episode
+            env = ColorJumpEnv(seed=env_seed)
+            state = env.reset()
+            done = False
+
+            while not done:
+                action = self.choose_action(state, explore=True)
+                result = env.step(action)
+                self.learn(state, action, result.reward, result.state, result.done)
+                state = result.state
+                done = result.done
+
+            scores.append(env.score)
+            best_score = max(best_score, env.score)
+
+        average = sum(scores) / len(scores) if scores else 0.0
+        return TrainStats(
+            episodes=episodes,
+            best_score=best_score,
+            average_score=average,
+            q_states=len(self.q_table),
+        )
+
+    def evaluate(self, episodes: int, seed: int | None = None) -> TrainStats:
+        scores: list[int] = []
+        best_score = 0
+
+        for episode in range(episodes):
+            env_seed = None if seed is None else seed + episode
+            env = ColorJumpEnv(seed=env_seed)
+            state = env.reset()
+            done = False
+
+            while not done:
+                action = self.choose_action(state, explore=False)
+                result = env.step(action)
+                state = result.state
+                done = result.done
+
+            scores.append(env.score)
+            best_score = max(best_score, env.score)
+
+        average = sum(scores) / len(scores) if scores else 0.0
+        return TrainStats(
+            episodes=episodes,
+            best_score=best_score,
+            average_score=average,
+            q_states=len(self.q_table),
+        )
+
+    def _values(self, state: State) -> list[float]:
+        key = state.key()
+        if key not in self.q_table:
+            self.q_table[key] = [0.0, 0.0]
+        return self.q_table[key]
