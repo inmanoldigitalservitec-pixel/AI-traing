@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .agent import QAgent, TAP
 from .env import ColorJumpEnv, GameConfig
-from .storage import load_q_table, reset_storage, save_q_table
+from .storage import DQN_MODEL_PATH, load_q_table, reset_storage, save_q_table
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +28,24 @@ def build_parser() -> argparse.ArgumentParser:
     play = subparsers.add_parser("play", help="Muestra una partida en texto")
     play.add_argument("--seed", type=int, default=7)
     play.add_argument("--max-steps", type=int, default=100000)
+
+    dqn_train = subparsers.add_parser("dqn-train", help="Entrena una IA DQN con PyTorch")
+    dqn_train.add_argument("--episodes", type=int, default=1000)
+    dqn_train.add_argument("--seed", type=int, default=42)
+    dqn_train.add_argument("--max-steps", type=int, default=10000)
+    dqn_train.add_argument("--eval-episodes", type=int, default=50)
+    dqn_train.add_argument("--model", type=Path, default=DQN_MODEL_PATH)
+
+    dqn_eval = subparsers.add_parser("dqn-eval", help="Evalua la IA DQN")
+    dqn_eval.add_argument("--episodes", type=int, default=100)
+    dqn_eval.add_argument("--seed", type=int, default=1000)
+    dqn_eval.add_argument("--max-steps", type=int, default=10000)
+    dqn_eval.add_argument("--model", type=Path, default=DQN_MODEL_PATH)
+
+    dqn_play = subparsers.add_parser("dqn-play", help="Muestra una partida DQN en texto")
+    dqn_play.add_argument("--seed", type=int, default=7)
+    dqn_play.add_argument("--max-steps", type=int, default=50000)
+    dqn_play.add_argument("--model", type=Path, default=DQN_MODEL_PATH)
 
     export = subparsers.add_parser("export", help="Exporta policy JSON")
     export.add_argument("--output", type=Path, default=Path("policy.json"))
@@ -89,6 +107,18 @@ def main() -> None:
         export_policy(agent, args.output)
         return
 
+    if args.command == "dqn-train":
+        dqn_train(args)
+        return
+
+    if args.command == "dqn-eval":
+        dqn_eval(args)
+        return
+
+    if args.command == "dqn-play":
+        dqn_play(args)
+        return
+
 
 def build_game_config(max_steps: int | None) -> GameConfig:
     config = GameConfig()
@@ -144,6 +174,80 @@ def play_episode(agent: QAgent, seed: int, config: GameConfig) -> None:
     print(f"Estados visitados: {len(visited_states)}")
     print(f"Altitud final: {env.altitude:.1f}")
     print(f"Velocidad final: {env.velocity:.1f}")
+
+
+def dqn_train(args) -> None:
+    try:
+        from .dqn_agent import DQNAgent
+    except ImportError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    config = build_game_config(args.max_steps)
+    model_path = Path(args.model)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if model_path.exists():
+        agent = DQNAgent.load(str(model_path))
+        print(f"Modelo DQN cargado: {model_path}")
+    else:
+        agent = DQNAgent(seed=args.seed)
+        print("Modelo DQN nuevo.")
+
+    stats = agent.train(
+        args.episodes,
+        seed=args.seed,
+        game_config=config,
+        eval_episodes=args.eval_episodes,
+    )
+    agent.save(str(model_path))
+    print(
+        f"DQN entrenada: {stats.episodes} | "
+        f"Promedio train: {stats.average_score:.2f} | "
+        f"Mejor train: {stats.best_score}"
+    )
+    print(
+        f"Evaluacion post-train: "
+        f"Promedio: {stats.eval_average_score:.2f} | "
+        f"Mejor: {stats.eval_best_score}"
+    )
+    print(f"Modelo guardado: {model_path}")
+
+
+def dqn_eval(args) -> None:
+    try:
+        from .dqn_agent import DQNAgent
+    except ImportError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    model_path = Path(args.model)
+    if not model_path.exists():
+        raise SystemExit(f"No existe modelo DQN: {model_path}. Ejecuta dqn-train primero.")
+
+    agent = DQNAgent.load(str(model_path))
+    stats = agent.evaluate(
+        args.episodes,
+        seed=args.seed,
+        game_config=build_game_config(args.max_steps),
+    )
+    print(
+        f"DQN evaluada: {stats.episodes} | "
+        f"Promedio: {stats.average_score:.2f} | "
+        f"Mejor: {stats.best_score}"
+    )
+
+
+def dqn_play(args) -> None:
+    try:
+        from .dqn_agent import DQNAgent
+    except ImportError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    model_path = Path(args.model)
+    if not model_path.exists():
+        raise SystemExit(f"No existe modelo DQN: {model_path}. Ejecuta dqn-train primero.")
+
+    agent = DQNAgent.load(str(model_path))
+    play_episode(agent, seed=args.seed, config=build_game_config(args.max_steps))
 
 
 def export_policy(agent: QAgent, output: Path) -> None:
