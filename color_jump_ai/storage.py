@@ -6,6 +6,7 @@ from pathlib import Path
 
 APP_DIR = Path(".color_jump_ai")
 Q_TABLE_PATH = APP_DIR / "q_table.json"
+DQN_MODEL_PATH = APP_DIR / "dqn_model.pt"
 
 
 def load_q_table(path: Path = Q_TABLE_PATH) -> dict[str, list[float]]:
