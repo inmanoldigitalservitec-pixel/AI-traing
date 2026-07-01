@@ -47,6 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     dqn_play.add_argument("--max-steps", type=int, default=50000)
     dqn_play.add_argument("--model", type=Path, default=DQN_MODEL_PATH)
 
+    dqn_reset = subparsers.add_parser("dqn-reset", help="Borra el modelo DQN entrenado")
+    dqn_reset.add_argument("--model", type=Path, default=DQN_MODEL_PATH)
+
     export = subparsers.add_parser("export", help="Exporta policy JSON")
     export.add_argument("--output", type=Path, default=Path("policy.json"))
 
@@ -119,6 +122,10 @@ def main() -> None:
         dqn_play(args)
         return
 
+    if args.command == "dqn-reset":
+        dqn_reset(args)
+        return
+
 
 def build_game_config(max_steps: int | None) -> GameConfig:
     config = GameConfig()
@@ -187,7 +194,10 @@ def dqn_train(args) -> None:
     model_path.parent.mkdir(parents=True, exist_ok=True)
 
     if model_path.exists():
-        agent = DQNAgent.load(str(model_path))
+        try:
+            agent = DQNAgent.load(str(model_path))
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         print(f"Modelo DQN cargado: {model_path}")
     else:
         agent = DQNAgent(seed=args.seed)
@@ -223,7 +233,10 @@ def dqn_eval(args) -> None:
     if not model_path.exists():
         raise SystemExit(f"No existe modelo DQN: {model_path}. Ejecuta dqn-train primero.")
 
-    agent = DQNAgent.load(str(model_path))
+    try:
+        agent = DQNAgent.load(str(model_path))
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     stats = agent.evaluate(
         args.episodes,
         seed=args.seed,
@@ -246,8 +259,21 @@ def dqn_play(args) -> None:
     if not model_path.exists():
         raise SystemExit(f"No existe modelo DQN: {model_path}. Ejecuta dqn-train primero.")
 
-    agent = DQNAgent.load(str(model_path))
+    try:
+        agent = DQNAgent.load(str(model_path))
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     play_episode(agent, seed=args.seed, config=build_game_config(args.max_steps))
+
+
+def dqn_reset(args) -> None:
+    model_path = Path(args.model)
+    if not model_path.exists():
+        print("No habia modelo DQN guardado.")
+        return
+
+    model_path.unlink()
+    print(f"Modelo DQN borrado: {model_path}")
 
 
 def export_policy(agent: QAgent, output: Path) -> None:
