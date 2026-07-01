@@ -16,6 +16,8 @@ class TrainStats:
     best_score: int
     average_score: float
     q_states: int
+    eval_average_score: float | None = None
+    eval_best_score: int | None = None
 
 
 class QAgent:
@@ -31,10 +33,17 @@ class QAgent:
         self.learning_rate = learning_rate
         self.discount = discount
         self.epsilon = epsilon
+        self.min_epsilon = 0.02
         self.random = random.Random(seed)
 
-    def choose_action(self, state: State, explore: bool = True) -> int:
-        if explore and self.random.random() < self.epsilon:
+    def choose_action(
+        self,
+        state: State,
+        explore: bool = True,
+        epsilon: float | None = None,
+    ) -> int:
+        current_epsilon = self.epsilon if epsilon is None else epsilon
+        if explore and self.random.random() < current_epsilon:
             return self.random.choice([WAIT, TAP])
 
         wait_q, tap_q = self._values(state)
@@ -55,18 +64,21 @@ class QAgent:
         episodes: int,
         seed: int | None = None,
         config: GameConfig | None = None,
+        eval_episodes: int = 100,
     ) -> TrainStats:
         scores: list[int] = []
         best_score = 0
 
         for episode in range(episodes):
+            progress = episode / max(1, episodes - 1)
+            epsilon = self.epsilon + (self.min_epsilon - self.epsilon) * progress
             env_seed = None if seed is None else seed + episode
             env = ColorJumpEnv(config=config, seed=env_seed)
             state = env.reset()
             done = False
 
             while not done:
-                action = self.choose_action(state, explore=True)
+                action = self.choose_action(state, explore=True, epsilon=epsilon)
                 result = env.step(action)
                 self.learn(state, action, result.reward, result.state, result.done)
                 state = result.state
@@ -76,11 +88,18 @@ class QAgent:
             best_score = max(best_score, env.score)
 
         average = sum(scores) / len(scores) if scores else 0.0
+        eval_stats = self.evaluate(
+            eval_episodes,
+            seed=None if seed is None else seed + episodes + 10_000,
+            config=config,
+        )
         return TrainStats(
             episodes=episodes,
             best_score=best_score,
             average_score=average,
             q_states=len(self.q_table),
+            eval_average_score=eval_stats.average_score,
+            eval_best_score=eval_stats.best_score,
         )
 
     def evaluate(
@@ -125,6 +144,9 @@ class QAgent:
         distance = state.distance_bucket
         velocity = state.velocity_bucket
         color_matches = state.ball_color == state.target_color
+
+        if state.tap_ready == 0:
+            return WAIT
 
         if not color_matches and distance <= 260:
             return WAIT
