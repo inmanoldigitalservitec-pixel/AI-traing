@@ -24,6 +24,12 @@ python3 -m color_jump_ai eval --episodes 100 --max-steps 10000
 python3 -m color_jump_ai play --max-steps 50000
 ```
 
+Si actualizaste desde una version anterior, borra la memoria vieja antes de entrenar:
+
+```bash
+python3 -m color_jump_ai reset
+```
+
 ## Comandos
 
 Entrenar 5000 partidas:
