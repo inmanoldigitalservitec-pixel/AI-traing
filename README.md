@@ -16,12 +16,12 @@ El entrenamiento corre sin graficos para poder simular muchas partidas rapido. E
 
 - Python 3.10+
 - Q-learning no requiere dependencias externas
-- DQN requiere PyTorch
+- DQN requiere NumPy y PyTorch
 
 Instalar PyTorch:
 
 ```bash
-python3 -m pip install torch
+python3 -m pip install numpy torch
 ```
 
 ## Flujo recomendado
@@ -41,6 +41,12 @@ python3 -m color_jump_ai reset
 ```
 
 ## Flujo DQN con PyTorch
+
+Si vienes de una version anterior del DQN, borra el modelo viejo porque cambio la entrada de la red:
+
+```bash
+python3 -m color_jump_ai dqn-reset
+```
 
 Entrenar la red neuronal:
 
@@ -112,7 +118,14 @@ Reiniciar memoria:
 python -m color_jump_ai reset
 ```
 
+Reiniciar modelo DQN:
+
+```bash
+python -m color_jump_ai dqn-reset
+```
+
 ## Archivos generados
 
 - `.color_jump_ai/q_table.json`: memoria aprendida por la IA.
+- `.color_jump_ai/dqn_model.pt`: modelo aprendido por la DQN.
 - `policy.json`: politica exportada para integrarla con JavaScript.
