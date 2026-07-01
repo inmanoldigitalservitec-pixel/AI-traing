@@ -16,8 +16,9 @@ from .agent import TAP, WAIT
 from .env import ColorJumpEnv, GameConfig, State
 
 
-STATE_SIZE = 10
+STATE_SIZE = 14
 ACTION_SIZE = 2
+MODEL_VERSION = 2
 
 
 @dataclass
@@ -96,7 +97,12 @@ class DQNAgent:
         with torch.no_grad():
             tensor = torch.tensor([state_to_vector(state)], dtype=torch.float32, device=self.device)
             q_values = self.policy(tensor)[0]
-        return int(torch.argmax(q_values).item())
+            wait_q, tap_q = float(q_values[WAIT].item()), float(q_values[TAP].item())
+
+        if abs(tap_q - wait_q) < 0.75:
+            return self._heuristic_action(state)
+
+        return TAP if tap_q > wait_q else WAIT
 
     def train(
         self,
@@ -122,11 +128,12 @@ class DQNAgent:
             while not done:
                 action = self.choose_action(state, explore=True, epsilon=epsilon)
                 result = env.step(action)
+                reward = self._shape_reward(state, action, result.reward, result.state)
                 self.replay.push(
                     (
                         state_to_vector(state),
                         action,
-                        result.reward,
+                        reward,
                         state_to_vector(result.state),
                         result.done,
                     )
@@ -186,17 +193,72 @@ class DQNAgent:
             {
                 "model": self.policy.state_dict(),
                 "config": self.config.__dict__,
+                "model_version": MODEL_VERSION,
+                "state_size": STATE_SIZE,
             },
             path,
         )
 
     @classmethod
-    def load(cls, path: str, device: str | None = None) -> "DQNAgent":
+    def load(cls, path: str, device: str | None = None) -> DQNAgent:
         checkpoint = torch.load(path, map_location=device or "cpu")
+        state_size = int(checkpoint.get("state_size", 0))
+        model_version = int(checkpoint.get("model_version", 1))
+        if state_size != STATE_SIZE or model_version != MODEL_VERSION:
+            raise ValueError(
+                "Modelo DQN incompatible con esta version. "
+                "Borra el modelo viejo con: python3 -m color_jump_ai dqn-reset"
+            )
         agent = cls(config=DQNConfig(**checkpoint["config"]), device=device)
         agent.policy.load_state_dict(checkpoint["model"])
         agent.target.load_state_dict(agent.policy.state_dict())
         return agent
+
+    def _heuristic_action(self, state: State) -> int:
+        distance = state.distance_bucket
+        velocity = state.velocity_bucket
+        color_matches = state.ball_color == state.target_color
+
+        if state.tap_ready == 0:
+            return WAIT
+
+        if not color_matches and distance <= 260:
+            return WAIT
+
+        if color_matches and 0 <= distance <= 240:
+            return TAP
+
+        if velocity <= -3 and distance > 100:
+            return TAP
+
+        if 0 <= distance <= 220:
+            if not color_matches:
+                return WAIT
+            if velocity <= 5:
+                return TAP
+            return WAIT
+
+        if distance <= 0 and color_matches and velocity < 6:
+            return TAP
+
+        return WAIT
+
+    def _shape_reward(self, state: State, action: int, reward: float, next_state: State) -> float:
+        shaped = reward
+
+        if next_state.falling and next_state.velocity_bucket <= -6:
+            shaped -= 0.08
+
+        if state.tap_ready and action == WAIT and state.velocity_bucket <= -4:
+            shaped -= 0.05
+
+        if state.tap_ready and action == TAP and state.ball_color == state.target_color:
+            shaped += 0.03
+
+        if state.tap_ready and action == TAP and state.ball_color != state.target_color:
+            shaped -= 0.03
+
+        return shaped
 
     def _learn_step(self) -> None:
         if len(self.replay) < max(self.config.batch_size, self.config.warmup_steps):
@@ -235,6 +297,10 @@ def state_to_vector(state: State) -> list[float]:
         1.0 if state.ball_color == 1 else 0.0,
         1.0 if state.ball_color == 2 else 0.0,
         1.0 if state.ball_color == 3 else 0.0,
+        1.0 if state.target_color == 0 else 0.0,
+        1.0 if state.target_color == 1 else 0.0,
+        1.0 if state.target_color == 2 else 0.0,
+        1.0 if state.target_color == 3 else 0.0,
         1.0 if state.target_color == state.ball_color else 0.0,
         1.0 if state.falling else 0.0,
         1.0 if state.tap_ready else 0.0,
