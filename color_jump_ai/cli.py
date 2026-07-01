@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 from pathlib import Path
 
 from .agent import QAgent, TAP
-from .env import ColorJumpEnv
+from .env import ColorJumpEnv, GameConfig
 from .storage import load_q_table, reset_storage, save_q_table
 
 
@@ -16,13 +17,16 @@ def build_parser() -> argparse.ArgumentParser:
     train = subparsers.add_parser("train", help="Entrena la IA")
     train.add_argument("--episodes", type=int, default=1000)
     train.add_argument("--seed", type=int, default=42)
+    train.add_argument("--max-steps", type=int, default=None)
 
     evaluate = subparsers.add_parser("eval", help="Evalua la IA")
     evaluate.add_argument("--episodes", type=int, default=200)
     evaluate.add_argument("--seed", type=int, default=1000)
+    evaluate.add_argument("--max-steps", type=int, default=None)
 
     play = subparsers.add_parser("play", help="Muestra una partida en texto")
     play.add_argument("--seed", type=int, default=7)
+    play.add_argument("--max-steps", type=int, default=100000)
 
     export = subparsers.add_parser("export", help="Exporta policy JSON")
     export.add_argument("--output", type=Path, default=Path("policy.json"))
@@ -43,7 +47,8 @@ def main() -> None:
     agent = QAgent(q_table=q_table)
 
     if args.command == "train":
-        stats = agent.train(args.episodes, seed=args.seed)
+        config = build_game_config(args.max_steps)
+        stats = agent.train(args.episodes, seed=args.seed, config=config)
         save_q_table(agent.q_table)
         print(
             f"Entrenadas: {stats.episodes} | "
@@ -54,7 +59,8 @@ def main() -> None:
         return
 
     if args.command == "eval":
-        stats = agent.evaluate(args.episodes, seed=args.seed)
+        config = build_game_config(args.max_steps)
+        stats = agent.evaluate(args.episodes, seed=args.seed, config=config)
         print(
             f"Evaluadas: {stats.episodes} | "
             f"Promedio: {stats.average_score:.2f} | "
@@ -64,7 +70,8 @@ def main() -> None:
         return
 
     if args.command == "play":
-        play_episode(agent, seed=args.seed)
+        config = build_game_config(args.max_steps)
+        play_episode(agent, seed=args.seed, config=config)
         return
 
     if args.command == "export":
@@ -72,8 +79,15 @@ def main() -> None:
         return
 
 
-def play_episode(agent: QAgent, seed: int) -> None:
-    env = ColorJumpEnv(seed=seed)
+def build_game_config(max_steps: int | None) -> GameConfig:
+    config = GameConfig()
+    if max_steps is None:
+        return config
+    return replace(config, max_steps=max_steps)
+
+
+def play_episode(agent: QAgent, seed: int, config: GameConfig) -> None:
+    env = ColorJumpEnv(config=config, seed=seed)
     state = env.reset()
     done = False
     taps = 0
