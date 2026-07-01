@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import random
 
-from .env import ColorJumpEnv, State
+from .env import ColorJumpEnv, GameConfig, State
 
 
 WAIT = 0
@@ -50,13 +50,18 @@ class QAgent:
         values[action] += self.learning_rate * (target - values[action])
         self.q_table[state.key()] = values
 
-    def train(self, episodes: int, seed: int | None = None) -> TrainStats:
+    def train(
+        self,
+        episodes: int,
+        seed: int | None = None,
+        config: GameConfig | None = None,
+    ) -> TrainStats:
         scores: list[int] = []
         best_score = 0
 
         for episode in range(episodes):
             env_seed = None if seed is None else seed + episode
-            env = ColorJumpEnv(seed=env_seed)
+            env = ColorJumpEnv(config=config, seed=env_seed)
             state = env.reset()
             done = False
 
@@ -78,13 +83,18 @@ class QAgent:
             q_states=len(self.q_table),
         )
 
-    def evaluate(self, episodes: int, seed: int | None = None) -> TrainStats:
+    def evaluate(
+        self,
+        episodes: int,
+        seed: int | None = None,
+        config: GameConfig | None = None,
+    ) -> TrainStats:
         scores: list[int] = []
         best_score = 0
 
         for episode in range(episodes):
             env_seed = None if seed is None else seed + episode
-            env = ColorJumpEnv(seed=env_seed)
+            env = ColorJumpEnv(config=config, seed=env_seed)
             state = env.reset()
             done = False
 
