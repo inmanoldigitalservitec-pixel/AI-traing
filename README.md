@@ -34,6 +34,20 @@ Ver una partida en modo texto:
 python -m color_jump_ai play
 ```
 
+Por defecto `play` corre hasta `100000` pasos para que puedas observar una partida larga. Puedes ajustar la duracion:
+
+```bash
+python -m color_jump_ai play --max-steps 10000
+python -m color_jump_ai play --max-steps 250000
+```
+
+Tambien puedes evaluar o entrenar con mas pasos por partida:
+
+```bash
+python -m color_jump_ai eval --episodes 50 --max-steps 10000
+python -m color_jump_ai train --episodes 5000 --max-steps 10000
+```
+
 Exportar la politica para usarla luego en el juego web:
 
 ```bash
