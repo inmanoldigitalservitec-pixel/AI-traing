@@ -39,11 +39,12 @@ class State:
     ball_color: int
     target_color: int
     falling: int
+    tap_ready: int
 
     def key(self) -> str:
         return (
             f"{self.distance_bucket}|{self.velocity_bucket}|"
-            f"{self.ball_color}|{self.target_color}|{self.falling}"
+            f"{self.ball_color}|{self.target_color}|{self.falling}|{self.tap_ready}"
         )
 
 
@@ -148,6 +149,7 @@ class ColorJumpEnv:
             ball_color=self.ball_color,
             target_color=target_color,
             falling=1 if self.velocity < 0 else 0,
+            tap_ready=1 if self.tap_cooldown == 0 else 0,
         )
 
     def _current_obstacle(self) -> Obstacle:
