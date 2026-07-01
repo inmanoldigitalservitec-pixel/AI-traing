@@ -76,15 +76,25 @@ def play_episode(agent: QAgent, seed: int) -> None:
     env = ColorJumpEnv(seed=seed)
     state = env.reset()
     done = False
+    taps = 0
+    waits = 0
+    best_score = 0
+    visited_states: set[str] = set()
 
     print("Partida IA")
     print("step | action | score | altitude | velocity | state")
     print("-" * 72)
 
     while not done:
+        visited_states.add(state.key())
         action = agent.choose_action(state, explore=False)
         result = env.step(action)
         label = "tap" if action == TAP else "wait"
+        if action == TAP:
+            taps += 1
+        else:
+            waits += 1
+        best_score = max(best_score, env.score)
 
         if env.steps % 8 == 0 or action == TAP or result.done:
             print(
@@ -97,6 +107,18 @@ def play_episode(agent: QAgent, seed: int) -> None:
 
     print("-" * 72)
     print(f"Final: score={env.score}, reason={result.reason}")
+    print("")
+    print("Resumen")
+    print("-" * 72)
+    print(f"Score final: {env.score}")
+    print(f"Mejor score durante la partida: {best_score}")
+    print(f"Motivo de cierre: {result.reason}")
+    print(f"Pasos totales: {env.steps}")
+    print(f"Taps: {taps}")
+    print(f"Waits: {waits}")
+    print(f"Estados visitados: {len(visited_states)}")
+    print(f"Altitud final: {env.altitude:.1f}")
+    print(f"Velocidad final: {env.velocity:.1f}")
 
 
 def export_policy(agent: QAgent, output: Path) -> None:
