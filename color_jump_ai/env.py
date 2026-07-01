@@ -12,13 +12,15 @@ class GameConfig:
     fall_limit: float = -70.0
     fall_grace_frames: int = 62
     first_obstacle_altitude: float = 300.0
-    obstacle_spacing: float = 260.0
+    obstacle_spacing: float = 380.0
     obstacle_radius: float = 72.0
     pass_padding: float = 35.0
     color_count: int = 4
     max_steps: int = 3500
-    min_rotation_speed: float = 0.018
-    max_rotation_speed: float = 0.030
+    min_rotation_speed: float = 0.004
+    max_rotation_speed: float = 0.010
+    tap_penalty: float = 0.04
+    tap_cooldown_frames: int = 6
 
 
 @dataclass
@@ -64,6 +66,7 @@ class ColorJumpEnv:
         self.ball_color = 0
         self.score = 0
         self.steps = 0
+        self.tap_cooldown = 0
         self.next_obstacle: Obstacle | None = None
         self.reset()
 
@@ -74,20 +77,29 @@ class ColorJumpEnv:
         self.ball_color = self.random.randrange(self.config.color_count)
         self.score = 0
         self.steps = 0
+        self.tap_cooldown = 0
         self.next_obstacle = self._make_obstacle(self.config.first_obstacle_altitude)
         return self.state()
 
     def step(self, action: int) -> StepResult:
         # action 0 = wait, action 1 = tap
-        if action == 1:
+        tap_accepted = action == 1 and self.tap_cooldown == 0
+        if tap_accepted:
             self.velocity = self.config.jump_force
             self.fall_frames = 0
+            self.tap_cooldown = self.config.tap_cooldown_frames
 
         self.velocity -= self.config.gravity
         self.altitude += self.velocity
         self.steps += 1
+        if self.tap_cooldown > 0:
+            self.tap_cooldown -= 1
 
         reward = 0.02
+        if tap_accepted:
+            reward -= self.config.tap_penalty
+        elif action == 1:
+            reward -= self.config.tap_penalty * 2
         done = False
         reason = None
 
