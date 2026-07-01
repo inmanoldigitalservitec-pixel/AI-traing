@@ -1,5 +1,6 @@
 .color_jump_ai/
 policy.json
+*.pt
 __pycache__/
 *.pyc
 .DS_Store
