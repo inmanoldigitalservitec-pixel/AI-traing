@@ -4,5 +4,8 @@ version = "0.1.0"
 description = "Python MVP for training a Color Jump AI agent"
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+dqn = ["torch"]
+
 [tool.ruff]
 line-length = 100
